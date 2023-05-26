@@ -9,9 +9,11 @@ from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from get_dataset import train_dataset_prepare, test_dataset_prepare
-from my_model import Base_complex_model,Res_Base_complex_model
+from my_model import Base_complex_model, Res_Base_complex_model, CBAM_Res_Base_complex_model,CBAM_Residual_Base_complex_model
 from matplotlib import pyplot as plt
-from tqdm import tqdm,trange
+from tqdm import tqdm, trange
+from Visualization import draw_confusion_matrix
+from colorama import Fore, Back, Style
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -28,7 +30,7 @@ class Config:
             epochs: int = 40,
             lr: float = 0.001,
             n_classes: int = 10,
-            save_path: str = 'model_weight/Res_complex_conv.pt',
+            save_path: str = 'model_weight/test.pt',
             device: int = 0,
             rand_num: int = 50):
         self.batch_size = batch_size
@@ -107,8 +109,8 @@ def main():
     device = torch.device('cuda:' + str(conf.device))
     RANDOM_SEED = 300
     set_seed(RANDOM_SEED)
-    test_x=np.arange(conf.epochs)
-    test_y=np.zeros(conf.epochs)
+    test_x = np.arange(conf.epochs)
+    test_y = np.zeros(conf.epochs)
 
     x_train, x_val, y_train, y_val = train_dataset_prepare(
         conf.n_classes, conf.rand_num)
@@ -119,8 +121,8 @@ def main():
     val_data_loader = DataLoader(
         val_dataset, conf.batch_size, shuffle=True)
 
-    # model = Base_complex_model()
-    model = Res_Base_complex_model()
+    model = CBAM_Residual_Base_complex_model()
+    # model = CBAM_Res_Base_complex_model()
 
     if torch.cuda.is_available():
         model = model.to(device)
@@ -131,16 +133,22 @@ def main():
     optim = torch.optim.Adam(model.parameters(), lr=conf.lr, weight_decay=0)
     # 开始训练
     current_min_test_loss = 1
-    for epoch in range( conf.epochs ):
-        train_loss = train(model, loss, optim, train_data_loader, epoch, device)
+    for epoch in range(conf.epochs):
+        train_loss = train(
+            model,
+            loss,
+            optim,
+            train_data_loader,
+            epoch,
+            device)
         # if epoch % 5 == 0:
         test_loss = test(model, loss, val_data_loader, epoch, device)
         test_y[epoch] = train_loss
         if test_loss < current_min_test_loss:
-            print(
-                '测试集损失从{}减小到了{}，保存新的模型参数'.format(
-                    current_min_test_loss,
-                    test_loss))
+            print(Fore.RED + Back.CYAN +
+                  '测试集损失从{}减小到了{}，保存新的模型参数'.format(
+                      current_min_test_loss,
+                      test_loss) + Style.RESET_ALL)
             current_min_test_loss = test_loss
             torch.save(model.state_dict(), conf.save_path)
         else:
@@ -148,20 +156,23 @@ def main():
         print('-------------------------------------------------------------------')
 
     plt.figure(1)
-    plt.plot(test_x,test_y)
+    plt.plot(test_x, test_y)
     plt.xlabel('epoch')
     plt.ylabel('loss')
-    plt.title(conf.save_path.replace('model_weight/','').replace('.pt',''))
-    plt.savefig(conf.save_path.replace('.pt','.png'))
+    plt.title(conf.save_path.replace('model_weight/', '').replace('.pt', ''))
+    plt.savefig(conf.save_path.replace('.pt', '.png'))
 
     plt.show()
+
+    draw_confusion_matrix(model, device, 10)
+
 
 def moudle_test():
     device = torch.device('cuda:0')
     model = Res_Base_complex_model()
     model.load_state_dict(torch.load('model_weight/test.pt'))
     model = model.to(device)
-    model.eval() # 固定dropout和批次归一化
+    model.eval()  # 固定dropout和批次归一化
     print(model)
     # 支持中文
     plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
@@ -184,14 +195,15 @@ def moudle_test():
     data = data.to(device)
     label = Y_train_label[i]
     pred = model(data)
-    pred_lable = pred.argmax(dim = 1,keepdim=True)
+    pred_lable = pred.argmax(dim=1, keepdim=True)
     plt.figure(1)
     plt.xlabel('x')
     plt.ylabel('I/Q')
     plt.title('第' + str(i) + '组数据  ' + 'class:' + str(Y_train_label[i]))
     plt.plot(x_axis, ((X_train_label[i][0][:]))[0], color='r', label='I')
     plt.plot(x_axis, ((X_train_label[i][0][:]))[1], color='g', label='Q')
-    plt.text(100, 0.5, 'Pred_class:' + str(pred_lable.item()), fontsize=22, color="b")
+    plt.text(100, 0.5, 'Pred_class:' +
+             str(pred_lable.item()), fontsize=22, color="b")
     plt.legend()
     # ----------------------------------------------------
     plt.figure(2)
@@ -202,14 +214,15 @@ def moudle_test():
     plt.ylabel('I')
     plt.title('第' + str(i) + '组数据  ' + 'class:' + str(Y_train_label[i]))
     plt.plot(x_axis, ((X_train_label[i][0][:]))[0], color='r')
-    plt.text(100, 0.5, 'Pred_class:' + str(pred_lable.item()), fontsize=22, color="b")
+    plt.text(100, 0.5, 'Pred_class:' +
+             str(pred_lable.item()), fontsize=22, color="b")
     plt.sca(ax2)
     plt.xlabel('x')
     plt.ylabel('Q')
     plt.plot(x_axis, ((X_train_label[i][0][:]))[1], color='g')
-    plt.text(100, 0.5, 'Pred_class:' + str(pred_lable.item()), fontsize=22, color="b")
+    plt.text(100, 0.5, 'Pred_class:' +
+             str(pred_lable.item()), fontsize=22, color="b")
     plt.show()
-
 
 
 if __name__ == '__main__':

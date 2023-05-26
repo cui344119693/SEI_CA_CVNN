@@ -2,7 +2,7 @@ from sklearn.metrics import confusion_matrix
 from get_dataset import test_dataset_prepare
 from matplotlib import pyplot as plt
 import numpy as np
-from my_model import Res_Base_complex_model,Base_complex_model
+from my_model import Res_Base_complex_model,Base_complex_model,CBAM_Res_Base_complex_model
 import torch
 from get_dataset import train_dataset_prepare,test_dataset_prepare
 from torch.utils.data import TensorDataset,DataLoader
@@ -85,8 +85,8 @@ def draw_confusion_matrix(model:nn.Module,device,classes:int=10,is_save:bool=Fal
 if __name__ =='__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     batch_size =32
-    model = Base_complex_model()
-    model.load_state_dict(torch.load('model_weight/complex_conv.pt'))
+    model = CBAM_Res_Base_complex_model()
+    model.load_state_dict(torch.load('model_weight/CBAM_Res_complex_conv.pt'))
     model = model.to(device)
     draw_confusion_matrix(model,device,10,is_save=False)
 

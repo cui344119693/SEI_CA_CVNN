@@ -5,24 +5,6 @@ from complexcnn import ComplexConv
 
 
 
-
-
-class ChannelAttention1d(nn.Module):
-    def __init__(self):
-        pass
-
-    def forward(self,x):
-        pass
-
-
-class SpatialAttention1d(nn.Module):
-    def __init__(self):
-        pass
-
-    def forward(self,x):
-        pass
-
-
 class ChannelAttention(nn.Module):
     """
     paper: CBAM: Convolutional Block Attention Module
@@ -43,7 +25,7 @@ class ChannelAttention(nn.Module):
         avg_out = self.fc(self.avg_pool(x))
         max_out = self.fc(self.max_pool(x))
         out = avg_out + max_out
-        return self.sigmoid(out)
+        return x*self.sigmoid(out)
 
 
 class SpatialAttention(nn.Module):
@@ -63,9 +45,9 @@ class SpatialAttention(nn.Module):
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
-        x = torch.cat([avg_out, max_out], dim=1)
-        x = self.conv1(x)
-        return self.sigmoid(x)
+        cat_out = torch.cat([avg_out, max_out], dim=1)
+        cat_out = self.conv1(cat_out)
+        return x*self.sigmoid(cat_out)
 
 
 class CA_Block(nn.Module):
@@ -98,26 +80,26 @@ class CA_Block(nn.Module):
 
 
 class Residual(nn.Module):
-    def __init__(self, input_channels, num_channels,
+    def __init__(self, channels,
                   conv_kernel_size=3,BN_num_features=64,MP_kernel_size=2):
         super().__init__()
         self.conv1 = Complex_block(
-            conv_in_channels=input_channels,
-            conv_out_channels=num_channels,
+            conv_in_channels=channels,
+            conv_out_channels=channels,
             conv_kernel_size=conv_kernel_size,
             BN_num_features=BN_num_features,
             MP_kernel_size=MP_kernel_size)
 
         self.conv2 = Complex_block(
-            conv_in_channels=num_channels,
-            conv_out_channels=num_channels,
+            conv_in_channels=channels,
+            conv_out_channels=channels,
             conv_kernel_size=conv_kernel_size,
             BN_num_features=BN_num_features,
             MP_kernel_size=MP_kernel_size)
 
         self.conv3 = ComplexConv(
-            in_channels=input_channels,
-            out_channels=num_channels,
+            in_channels=channels,
+            out_channels=channels,
             kernel_size=conv_kernel_size,
             stride=4)
 
@@ -127,6 +109,46 @@ class Residual(nn.Module):
         Y = self.conv2(Y)
         if self.conv3:
             X = self.conv3(X)
+        Y += X
+        return Y
+
+
+class CBAM_Residual(nn.Module):
+    def __init__(self, channels,
+                  conv_kernel_size=3,BN_num_features=64,MP_kernel_size=2):
+        super(CBAM_Residual,self).__init__()
+        self.conv1 = Complex_block(
+            conv_in_channels=channels,
+            conv_out_channels=channels,
+            conv_kernel_size=conv_kernel_size,
+            BN_num_features=BN_num_features,
+            MP_kernel_size=MP_kernel_size)
+
+        self.conv2 = Complex_block(
+            conv_in_channels=channels,
+            conv_out_channels=channels,
+            conv_kernel_size=conv_kernel_size,
+            BN_num_features=BN_num_features,
+            MP_kernel_size=MP_kernel_size)
+
+        self.conv3 = ComplexConv(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=conv_kernel_size,
+            stride=4)
+
+        self.channel_att = ChannelAttention(channels)
+        self.spatial_att = SpatialAttention()
+
+
+    def forward(self, X):
+        Y = self.conv1(X)
+        Y = self.conv2(Y)
+
+        X = self.channel_att(X)
+        X = self.spatial_att(X)
+        X = self.conv3(X)
+
         Y += X
         return Y
 
@@ -253,10 +275,10 @@ class Res_Base_complex_model(nn.Module):
             conv_kernel_size=3,
             BN_num_features=64,
             MP_kernel_size=2)
-        self.res_block1=Residual(64,64)
-        self.res_block2 = Residual(64, 64)
-        self.res_block3 = Residual(64, 64,conv_kernel_size=2)
-        self.res_block4 = Residual(64, 64,conv_kernel_size=2)
+        self.res_block1=Residual(64)
+        self.res_block2 = Residual(64)
+        self.res_block3 = Residual(64,conv_kernel_size=2)
+        self.res_block4 = Residual(64,conv_kernel_size=2)
 
 
         self.flatten = nn.Flatten()
@@ -284,8 +306,91 @@ class Res_Base_complex_model(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
+
+class CBAM_Residual_Base_complex_model(nn.Module):
+    '''
+    此模块使用CBAM_Residual作为残差模块
+    '''
+    def __init__(self):
+        super(CBAM_Residual_Base_complex_model, self).__init__()
+        self.complex_block1 = Complex_block(
+            conv_in_channels=1,
+            conv_out_channels=64,
+            conv_kernel_size=3,
+            BN_num_features=64,
+            MP_kernel_size=2)
+        self.res_block1=CBAM_Residual(64)
+        self.res_block2 = CBAM_Residual(64)
+        self.res_block3 = CBAM_Residual(64,conv_kernel_size=2)
+        self.res_block4 = CBAM_Residual(64,conv_kernel_size=2)
+
+
+        self.flatten = nn.Flatten()
+        self.linear1 = nn.LazyLinear(512)
+        self.linear2 = nn.LazyLinear(128)
+        self.linear3 = nn.LazyLinear(10)
+
+    def forward(self, x):
+        x = self.complex_block1(x)
+        x = self.res_block1(x)
+        x = self.res_block2(x)
+        x = self.res_block3(x)
+        x = self.res_block4(x)
+
+        x = self.flatten(x)
+        x = self.linear1(x)
+        x = F.relu(x)
+        x = self.linear2(x)
+        x = F.relu(x)
+        x = self.linear3(x)
+
+        return F.log_softmax(x, dim=1)
+
+
+
+class CBAM_Res_Base_complex_model(nn.Module):
+    def __init__(self):
+        super(CBAM_Res_Base_complex_model, self).__init__()
+        self.complex_block1 = Complex_block(
+            conv_in_channels=1,
+            conv_out_channels=64,
+            conv_kernel_size=3,
+            BN_num_features=64,
+            MP_kernel_size=2)
+        self.res_block1=Residual(64)
+        self.res_block2 = Residual(64)
+        self.res_block3 = Residual(64, conv_kernel_size=2)
+        self.res_block4 = Residual(64, conv_kernel_size=2)
+        self.channel_att = ChannelAttention(64)
+        self.spatial_att = SpatialAttention()
+
+
+        self.flatten = nn.Flatten()
+        self.linear1 = nn.LazyLinear(512)
+        self.linear2 = nn.LazyLinear(128)
+        self.linear3 = nn.LazyLinear(10)
+
+    def forward(self, x):
+        x = self.complex_block1(x)
+        x = self.channel_att(x) #CBAM 注意力模块
+        x= self.spatial_att(x)
+        x = self.res_block1(x)
+        x = self.res_block2(x)
+        x = self.res_block3(x)
+        x = self.res_block4(x)
+
+        x = self.flatten(x)
+        x = self.linear1(x)
+        x = F.relu(x)
+        x = self.linear2(x)
+        x = F.relu(x)
+        x = self.linear3(x)
+
+        return F.log_softmax(x, dim=1)
+
+
 if __name__ == '__main__':
-    model = Res_Base_complex_model()
+    model = CBAM_Res_Base_complex_model()
     print(model)
     test_input = torch.randn((32, 1, 2 ,4800))
     out = model(test_input)
