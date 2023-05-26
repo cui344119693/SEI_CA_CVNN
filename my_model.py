@@ -29,14 +29,14 @@ class ChannelAttention(nn.Module):
     :arg in_planes :输入通道数
     :return 通道维度上的加权系数
     """
-    def __init__(self, in_planes, ratio=16):
+    def __init__(self, in_planes, ratio=8):
         super(ChannelAttention, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1) # arg 1 is output size
         self.max_pool = nn.AdaptiveMaxPool2d(1)
 
-        self.fc = nn.Sequential(nn.Conv2d(in_planes, in_planes // 16, 1, bias=False),
+        self.fc = nn.Sequential(nn.Conv2d(in_planes, in_planes // ratio, 1, bias=False),
                                 nn.ReLU(),
-                                nn.Conv2d(in_planes // 16, in_planes, 1, bias=False))
+                                nn.Conv2d(in_planes // ratio, in_planes, 1, bias=False))
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -55,8 +55,9 @@ class SpatialAttention(nn.Module):
     """
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
+        # self.conv_re = nn.Conv2d(in_channels,out_channels,(1,kernel_size),stride,(0,padding),dilation,groups,bias)
 
-        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size=(1,kernel_size), padding=(0,kernel_size//2), bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -98,7 +99,7 @@ class CA_Block(nn.Module):
 
 class Residual(nn.Module):
     def __init__(self, input_channels, num_channels,
-                  conv_kernel_size=3,BN_num_features=128,MP_kernel_size=2):
+                  conv_kernel_size=3,BN_num_features=64,MP_kernel_size=2):
         super().__init__()
         self.conv1 = Complex_block(
             conv_in_channels=input_channels,
@@ -145,8 +146,10 @@ class Complex_block(nn.Module):
             out_channels=conv_out_channels,
             kernel_size=conv_kernel_size,
             stride=stride)
-        self.batchnorm = nn.BatchNorm1d(num_features=BN_num_features)
-        self.maxpool = nn.MaxPool1d(kernel_size=MP_kernel_size)
+        self.batchnorm = nn.BatchNorm2d(num_features=BN_num_features)
+        self.maxpool = nn.MaxPool2d(kernel_size=(1,MP_kernel_size))
+        # self.batchnorm = nn.BatchNorm1d(num_features=BN_num_features)
+        # self.maxpool = nn.MaxPool1d(kernel_size=MP_kernel_size)
 
     def forward(self, x):
         x = self.conv(x)
@@ -163,55 +166,55 @@ class Base_complex_model(nn.Module):
             conv_in_channels=1,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block2 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block3 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block4 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block5 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block6 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block7 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block8 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.complex_block9 = Complex_block(
             conv_in_channels=64,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
 
         self.flatten = nn.Flatten()
@@ -248,7 +251,7 @@ class Res_Base_complex_model(nn.Module):
             conv_in_channels=1,
             conv_out_channels=64,
             conv_kernel_size=3,
-            BN_num_features=128,
+            BN_num_features=64,
             MP_kernel_size=2)
         self.res_block1=Residual(64,64)
         self.res_block2 = Residual(64, 64)
@@ -282,8 +285,8 @@ class Res_Base_complex_model(nn.Module):
 
 
 if __name__ == '__main__':
-    model = SpatialAttention()
+    model = Res_Base_complex_model()
     print(model)
-    test_input = torch.randn((32, 64, 640,640))
+    test_input = torch.randn((32, 1, 2 ,4800))
     out = model(test_input)
-    print(out)
+    print(out.shape)

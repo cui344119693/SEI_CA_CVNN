@@ -83,12 +83,12 @@ def draw_confusion_matrix(model:nn.Module,device,classes:int=10,is_save:bool=Fal
 
 
 if __name__ =='__main__':
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     batch_size =32
-    model = Res_Base_complex_model()
-    model.load_state_dict(torch.load('model_weight/Res_complex_conv.pt'))
+    model = Base_complex_model()
+    model.load_state_dict(torch.load('model_weight/complex_conv.pt'))
     model = model.to(device)
-    draw_confusion_matrix(model,device,10,is_save=True)
+    draw_confusion_matrix(model,device,10,is_save=False)
 
 
 

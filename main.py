@@ -25,7 +25,7 @@ class Config:
             self,
             batch_size: int = 32,
             test_batch_size: int = 32,
-            epochs: int = 50,
+            epochs: int = 40,
             lr: float = 0.001,
             n_classes: int = 10,
             save_path: str = 'model_weight/Res_complex_conv.pt',
@@ -151,15 +151,16 @@ def main():
     plt.plot(test_x,test_y)
     plt.xlabel('epoch')
     plt.ylabel('loss')
-    plt.title('Res_complex_conv')
+    plt.title(conf.save_path.replace('model_weight/','').replace('.pt',''))
+    plt.savefig(conf.save_path.replace('.pt','.png'))
+
     plt.show()
 
 def moudle_test():
     device = torch.device('cuda:0')
     model = Res_Base_complex_model()
-    model.load_state_dict(torch.load('model_weight/Res_complex_conv.pt'))
+    model.load_state_dict(torch.load('model_weight/test.pt'))
     model = model.to(device)
-    # model =torch.load('model_weight/test.pth')
     model.eval() # 固定dropout和批次归一化
     print(model)
     # 支持中文
@@ -188,8 +189,8 @@ def moudle_test():
     plt.xlabel('x')
     plt.ylabel('I/Q')
     plt.title('第' + str(i) + '组数据  ' + 'class:' + str(Y_train_label[i]))
-    plt.plot(x_axis, ((X_train_label[i][:]))[0], color='r', label='I')
-    plt.plot(x_axis, ((X_train_label[i][:]))[1], color='g', label='Q')
+    plt.plot(x_axis, ((X_train_label[i][0][:]))[0], color='r', label='I')
+    plt.plot(x_axis, ((X_train_label[i][0][:]))[1], color='g', label='Q')
     plt.text(100, 0.5, 'Pred_class:' + str(pred_lable.item()), fontsize=22, color="b")
     plt.legend()
     # ----------------------------------------------------
@@ -200,12 +201,12 @@ def moudle_test():
     plt.xlabel('x')
     plt.ylabel('I')
     plt.title('第' + str(i) + '组数据  ' + 'class:' + str(Y_train_label[i]))
-    plt.plot(x_axis, ((X_train_label[i][:]))[0], color='r')
+    plt.plot(x_axis, ((X_train_label[i][0][:]))[0], color='r')
     plt.text(100, 0.5, 'Pred_class:' + str(pred_lable.item()), fontsize=22, color="b")
     plt.sca(ax2)
     plt.xlabel('x')
     plt.ylabel('Q')
-    plt.plot(x_axis, ((X_train_label[i][:]))[1], color='g')
+    plt.plot(x_axis, ((X_train_label[i][0][:]))[1], color='g')
     plt.text(100, 0.5, 'Pred_class:' + str(pred_lable.item()), fontsize=22, color="b")
     plt.show()
 
